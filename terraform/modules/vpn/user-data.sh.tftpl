@@ -1,0 +1,33 @@
+#!/bin/bash
+set -euo pipefail
+
+apt-get update
+apt-get install -y wireguard iptables-persistent
+
+sysctl -w net.ipv4.ip_forward=1
+echo 'net.ipv4.ip_forward=1' >/etc/sysctl.d/99-wireguard.conf
+
+wg genkey | tee /etc/wireguard/server.key | wg pubkey >/etc/wireguard/server.pub
+chmod 600 /etc/wireguard/server.key
+server_private_key="$(cat /etc/wireguard/server.key)"
+
+cat >/etc/wireguard/wg0.conf <<EOF
+[Interface]
+Address = 10.8.0.1/24
+ListenPort = ${wireguard_port}
+PrivateKey = $${server_private_key}
+PostUp = iptables -A FORWARD -i wg0 -j ACCEPT; iptables -A FORWARD -o wg0 -j ACCEPT; iptables -t nat -A POSTROUTING -s 10.8.0.0/24 -d ${vpc_cidr_block} -j MASQUERADE
+PostDown = iptables -D FORWARD -i wg0 -j ACCEPT; iptables -D FORWARD -o wg0 -j ACCEPT; iptables -t nat -D POSTROUTING -s 10.8.0.0/24 -d ${vpc_cidr_block} -j MASQUERADE
+EOF
+
+if [ -n "${client_public_key}" ]; then
+cat >>/etc/wireguard/wg0.conf <<EOF
+
+[Peer]
+PublicKey = ${client_public_key}
+AllowedIPs = 10.8.0.2/32
+EOF
+fi
+
+systemctl enable --now wg-quick@wg0
+iptables-save >/etc/iptables/rules.v4

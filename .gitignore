@@ -1,0 +1,10 @@
+node_modules/
+dist/
+guidelines/
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+.DS_Store
+.env
+*.log

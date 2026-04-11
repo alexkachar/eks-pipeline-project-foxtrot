@@ -1,0 +1,50 @@
+global:
+  environment: dev
+  awsRegion: us-east-1
+
+imagePullPolicy: IfNotPresent
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: ""
+    tag: latest
+  service:
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+backend:
+  replicaCount: 2
+  image:
+    repository: ""
+    tag: latest
+  service:
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+ingress:
+  host: todo.alexanderkachar.com
+  certificateArn: ""
+  groupName: todo-app-public
+
+monitoringIngress:
+  enabled: true
+  host: monitoring.alexanderkachar.com
+  groupName: todo-app-monitoring
+
+externalSecrets:
+  secretStoreName: aws-ssm
+  refreshInterval: 1h
+  parameterPrefix: /todo-app/dev

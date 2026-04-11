@@ -1,0 +1,90 @@
+#!/bin/bash
+set -euo pipefail
+
+dnf update -y
+dnf install -y docker git jq amazon-ecr-credential-helper
+systemctl enable --now docker
+useradd --create-home --shell /bin/bash actions
+usermod -aG docker actions
+
+mkdir -p /home/actions/.docker
+cat >/home/actions/.docker/config.json <<'JSON'
+{
+  "credsStore": "ecr-login"
+}
+JSON
+chown -R actions:actions /home/actions/.docker
+
+cat >/usr/local/bin/ssm-get-parameter <<'PY'
+#!/usr/bin/env python3
+import datetime
+import hashlib
+import hmac
+import json
+import os
+import sys
+import urllib.request
+
+region = os.environ["AWS_REGION"]
+name = sys.argv[1]
+
+token_req = urllib.request.Request("http://169.254.169.254/latest/api/token", method="PUT")
+token_req.add_header("X-aws-ec2-metadata-token-ttl-seconds", "21600")
+imdsv2 = urllib.request.urlopen(token_req, timeout=2).read().decode()
+
+def metadata(path):
+    req = urllib.request.Request("http://169.254.169.254/latest/" + path)
+    req.add_header("X-aws-ec2-metadata-token", imdsv2)
+    return urllib.request.urlopen(req, timeout=2).read().decode()
+
+role = metadata("meta-data/iam/security-credentials/")
+creds = json.loads(metadata("meta-data/iam/security-credentials/" + role))
+access_key = creds["AccessKeyId"]
+secret_key = creds["SecretAccessKey"]
+session_token = creds["Token"]
+service = "ssm"
+host = f"ssm.{region}.amazonaws.com"
+endpoint = f"https://{host}/"
+target = "AmazonSSM.GetParameter"
+payload = json.dumps({"Name": name, "WithDecryption": True})
+now = datetime.datetime.utcnow()
+amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+date_stamp = now.strftime("%Y%m%d")
+canonical_headers = f"content-type:application/x-amz-json-1.1\nhost:{host}\nx-amz-date:{amz_date}\nx-amz-security-token:{session_token}\nx-amz-target:{target}\n"
+signed_headers = "content-type;host;x-amz-date;x-amz-security-token;x-amz-target"
+canonical_request = "\n".join(["POST", "/", "", canonical_headers, signed_headers, hashlib.sha256(payload.encode()).hexdigest()])
+credential_scope = f"{date_stamp}/{region}/{service}/aws4_request"
+string_to_sign = "\n".join(["AWS4-HMAC-SHA256", amz_date, credential_scope, hashlib.sha256(canonical_request.encode()).hexdigest()])
+
+def sign(key, msg):
+    return hmac.new(key, msg.encode(), hashlib.sha256).digest()
+
+signing_key = sign(sign(sign(sign(("AWS4" + secret_key).encode(), date_stamp), region), service), "aws4_request")
+signature = hmac.new(signing_key, string_to_sign.encode(), hashlib.sha256).hexdigest()
+authorization = f"AWS4-HMAC-SHA256 Credential={access_key}/{credential_scope}, SignedHeaders={signed_headers}, Signature={signature}"
+req = urllib.request.Request(endpoint, data=payload.encode(), method="POST")
+req.add_header("Content-Type", "application/x-amz-json-1.1")
+req.add_header("X-Amz-Date", amz_date)
+req.add_header("X-Amz-Security-Token", session_token)
+req.add_header("X-Amz-Target", target)
+req.add_header("Authorization", authorization)
+print(json.loads(urllib.request.urlopen(req, timeout=10).read())["Parameter"]["Value"])
+PY
+chmod +x /usr/local/bin/ssm-get-parameter
+
+runner_version="2.328.0"
+mkdir -p /opt/actions-runner
+curl -fsSL "https://github.com/actions/runner/releases/download/v$${runner_version}/actions-runner-linux-x64-$${runner_version}.tar.gz" -o /tmp/actions-runner.tar.gz
+tar -xzf /tmp/actions-runner.tar.gz -C /opt/actions-runner
+chown -R actions:actions /opt/actions-runner
+
+github_pat="$(AWS_REGION="${region}" ssm-get-parameter "${github_token_parameter_name}")"
+registration_token="$(curl -fsSL -X POST \
+  -H "Authorization: Bearer $${github_pat}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${github_repo}/actions/runners/registration-token" | jq -r .token)"
+
+sudo -u actions bash -lc "cd /opt/actions-runner && ./config.sh --unattended --url https://github.com/${github_repo} --token $${registration_token} --name foxtrot-$(hostname) --labels self-hosted,linux,x64,foxtrot"
+cd /opt/actions-runner
+./svc.sh install actions
+./svc.sh start

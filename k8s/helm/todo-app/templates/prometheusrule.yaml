@@ -1,0 +1,35 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: todo-app-alerts
+  labels:
+    {{- include "todo-app.labels" . | nindent 4 }}
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: todo-app.rules
+      rules:
+        - alert: TodoAppHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+            /
+            clamp_min(sum(rate(http_requests_total[5m])), 1) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Todo API 5xx rate is above 5 percent
+        - alert: TodoAppPodRestartLoop
+          expr: increase(kube_pod_container_status_restarts_total{namespace="todo-app"}[15m]) > 3
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: Todo app pod restarted more than 3 times in 15 minutes
+        - alert: TodoAppRdsConnectionFailures
+          expr: increase(http_requests_total{route="/api/health",status_code="503"}[5m]) > 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: Todo API health checks are failing database connectivity
