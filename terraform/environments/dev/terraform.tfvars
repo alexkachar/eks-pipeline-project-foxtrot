@@ -12,5 +12,4 @@ developer_ip_cidr           = "5.29.10.1/32"
 wireguard_client_public_key = "6V76gueZCzjwpuw5wlmHXDGQbJodb6tfGrpoAZkzMB0="
 enable_cluster_addons       = true
 
-# Fill after the public ALB exists, then run terraform apply again for Route 53.
-alb_dns_name = ""
+alb_dns_name = "k8s-todoapppublic-ee3b245395-1012844162.us-east-1.elb.amazonaws.com"
