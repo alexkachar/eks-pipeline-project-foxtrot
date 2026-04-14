@@ -1,6 +1,6 @@
 frontend:
   image:
-    tag: latest
+    tag: 6fcbe3deb54a806c594539000a5002dfd856d5bf
 backend:
   image:
-    tag: latest
+    tag: 6fcbe3deb54a806c594539000a5002dfd856d5bf
