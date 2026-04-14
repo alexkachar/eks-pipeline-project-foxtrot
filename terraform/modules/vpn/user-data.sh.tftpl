@@ -1,8 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+export DEBIAN_FRONTEND=noninteractive
+
 apt-get update
-apt-get install -y wireguard iptables-persistent
+apt-get install -y wireguard iptables-persistent snapd
+snap install amazon-ssm-agent --classic || true
+systemctl enable --now snap.amazon-ssm-agent.amazon-ssm-agent.service || systemctl enable --now amazon-ssm-agent || true
 
 sysctl -w net.ipv4.ip_forward=1
 echo 'net.ipv4.ip_forward=1' >/etc/sysctl.d/99-wireguard.conf

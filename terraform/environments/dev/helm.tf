@@ -1,28 +1,38 @@
 resource "kubernetes_namespace" "external_secrets" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   metadata {
     name = "external-secrets"
   }
 }
 
 resource "kubernetes_namespace" "argocd" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   metadata {
     name = "argocd"
   }
 }
 
 resource "kubernetes_namespace" "monitoring" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   metadata {
     name = "monitoring"
   }
 }
 
 resource "kubernetes_namespace" "todo_app" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   metadata {
     name = "todo-app"
   }
 }
 
 resource "helm_release" "aws_load_balancer_controller" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "aws-load-balancer-controller"
   namespace  = "kube-system"
   repository = "https://aws.github.io/eks-charts"
@@ -60,8 +70,10 @@ resource "helm_release" "aws_load_balancer_controller" {
 }
 
 resource "helm_release" "external_secrets" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "external-secrets"
-  namespace  = kubernetes_namespace.external_secrets.metadata[0].name
+  namespace  = "external-secrets"
   repository = "https://charts.external-secrets.io"
   chart      = "external-secrets"
 
@@ -74,12 +86,17 @@ resource "helm_release" "external_secrets" {
     name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
     value = module.eks.eso_role_arn
   }
+
+  depends_on = [kubernetes_namespace.external_secrets]
 }
 
-resource "kubectl_manifest" "aws_ssm_secret_store" {
+resource "terraform_data" "aws_ssm_secret_store" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   depends_on = [helm_release.external_secrets]
-  yaml_body = yamlencode({
-    apiVersion = "external-secrets.io/v1beta1"
+
+  input = yamlencode({
+    apiVersion = "external-secrets.io/v1"
     kind       = "ClusterSecretStore"
     metadata = {
       name = "aws-ssm"
@@ -101,11 +118,21 @@ resource "kubectl_manifest" "aws_ssm_secret_store" {
       }
     }
   })
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cat <<'YAML' | kubectl apply -f -
+      ${self.input}
+      YAML
+    EOT
+  }
 }
 
 resource "helm_release" "argocd" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "argocd"
-  namespace  = kubernetes_namespace.argocd.metadata[0].name
+  namespace  = "argocd"
   repository = "https://argoproj.github.io/argo-helm"
   chart      = "argo-cd"
 
@@ -116,11 +143,15 @@ resource "helm_release" "argocd" {
       }
     }
   })]
+
+  depends_on = [kubernetes_namespace.argocd]
 }
 
 resource "helm_release" "loki" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "loki"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  namespace  = "monitoring"
   repository = "https://grafana.github.io/helm-charts"
   chart      = "loki"
 
@@ -150,19 +181,36 @@ resource "helm_release" "loki" {
     singleBinary = {
       replicas = 1
       persistence = {
-        enabled = true
-        size    = "10Gi"
+        enabled = false
       }
+      extraVolumes = [{
+        name     = "loki-data"
+        emptyDir = {}
+      }]
+      extraVolumeMounts = [{
+        name      = "loki-data"
+        mountPath = "/var/loki"
+      }]
+    }
+    chunksCache = {
+      enabled = false
+    }
+    resultsCache = {
+      enabled = false
     }
     read    = { replicas = 0 }
     write   = { replicas = 0 }
     backend = { replicas = 0 }
   })]
+
+  depends_on = [kubernetes_namespace.monitoring]
 }
 
 resource "helm_release" "promtail" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "promtail"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  namespace  = "monitoring"
   repository = "https://grafana.github.io/helm-charts"
   chart      = "promtail"
 
@@ -173,11 +221,15 @@ resource "helm_release" "promtail" {
       }]
     }
   })]
+
+  depends_on = [kubernetes_namespace.monitoring]
 }
 
 resource "helm_release" "kube_prometheus_stack" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   name       = "kube-prometheus-stack"
-  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  namespace  = "monitoring"
   repository = "https://prometheus-community.github.io/helm-charts"
   chart      = "kube-prometheus-stack"
 
@@ -207,19 +259,23 @@ resource "helm_release" "kube_prometheus_stack" {
       }
     }
   })]
+
+  depends_on = [kubernetes_namespace.monitoring]
 }
 
-resource "kubectl_manifest" "todo_app" {
+resource "terraform_data" "todo_app" {
+  count = var.enable_cluster_addons ? 1 : 0
+
   depends_on = [
     helm_release.argocd,
     helm_release.aws_load_balancer_controller,
-    kubectl_manifest.aws_ssm_secret_store,
+    terraform_data.aws_ssm_secret_store,
     helm_release.kube_prometheus_stack,
     helm_release.loki,
     helm_release.promtail
   ]
 
-  yaml_body = yamlencode({
+  input = yamlencode({
     apiVersion = "argoproj.io/v1alpha1"
     kind       = "Application"
     metadata = {
@@ -256,4 +312,12 @@ resource "kubectl_manifest" "todo_app" {
       }
     }
   })
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cat <<'YAML' | kubectl apply -f -
+      ${self.input}
+      YAML
+    EOT
+  }
 }

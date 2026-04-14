@@ -42,6 +42,12 @@ variable "wireguard_client_public_key" {
   default = ""
 }
 
+variable "enable_cluster_addons" {
+  type        = bool
+  description = "Install Kubernetes and Helm resources. Enable only after connecting through the VPN to the private EKS API."
+  default     = false
+}
+
 variable "alb_dns_name" {
   type    = string
   default = ""

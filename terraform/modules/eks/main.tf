@@ -56,6 +56,16 @@ resource "aws_security_group" "cluster" {
   tags = var.tags
 }
 
+resource "aws_security_group_rule" "cluster_api_from_vpc" {
+  type              = "ingress"
+  security_group_id = aws_security_group.cluster.id
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = [var.vpc_cidr_block]
+  description       = "Allow private EKS API access from VPC and VPN NAT traffic"
+}
+
 resource "aws_eks_cluster" "this" {
   name     = var.name
   role_arn = aws_iam_role.cluster.arn

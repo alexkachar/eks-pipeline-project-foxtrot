@@ -1,5 +1,5 @@
 data "aws_acm_certificate" "wildcard" {
-  domain      = "*.alexanderkachar.com"
+  domain      = var.domain_name
   statuses    = ["ISSUED"]
   most_recent = true
 }
@@ -41,6 +41,7 @@ module "eks" {
   source              = "../../modules/eks"
   name                = "${var.project_name}-dev"
   vpc_id              = module.vpc.vpc_id
+  vpc_cidr_block      = module.vpc.vpc_cidr_block
   private_subnet_ids  = module.vpc.private_subnet_ids
   kubernetes_version  = "1.35"
   node_instance_types = ["t3.large"]
