@@ -16,7 +16,8 @@ if kubectl get application todo-app -n argocd >/dev/null 2>&1; then
 fi
 
 helm uninstall todo-app -n todo-app --ignore-not-found >/dev/null 2>&1 || true
-kubectl delete ingress -n todo-app todo-app-public todo-app-monitoring --ignore-not-found || true
+kubectl delete ingress -n todo-app todo-app-public --ignore-not-found || true
+kubectl delete ingress -n monitoring todo-app-monitoring --ignore-not-found || true
 
 echo "Waiting for controller-managed ALBs to disappear..."
 for _ in {1..60}; do
@@ -29,5 +30,6 @@ for _ in {1..60}; do
 done
 
 perl -0pi -e 's/alb_dns_name\s*=\s*"[^"]*"/alb_dns_name = ""/' terraform.tfvars
+perl -0pi -e 's/monitoring_alb_dns_name\s*=\s*"[^"]*"/monitoring_alb_dns_name = ""/' terraform.tfvars
 
 terraform destroy
