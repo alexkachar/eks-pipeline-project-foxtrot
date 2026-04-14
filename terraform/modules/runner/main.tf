@@ -81,6 +81,11 @@ resource "aws_iam_role_policy_attachment" "runner" {
   policy_arn = aws_iam_policy.runner.arn
 }
 
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.runner.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_instance_profile" "runner" {
   name = "${var.name}-runner"
   role = aws_iam_role.runner.name
@@ -99,6 +104,11 @@ resource "aws_instance" "runner" {
     github_token_parameter_name = var.github_token_parameter_name
     region                      = data.aws_region.current.name
   })
+
+  root_block_device {
+    volume_size = 30
+    volume_type = "gp3"
+  }
 
   tags = {
     Name = "${var.name}-runner"

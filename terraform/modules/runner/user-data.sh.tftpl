@@ -2,7 +2,8 @@
 set -euo pipefail
 
 dnf update -y
-dnf install -y docker git jq amazon-ecr-credential-helper
+dnf install -y amazon-ssm-agent docker git jq amazon-ecr-credential-helper libicu
+systemctl enable --now amazon-ssm-agent
 systemctl enable --now docker
 useradd --create-home --shell /bin/bash actions
 usermod -aG docker actions
