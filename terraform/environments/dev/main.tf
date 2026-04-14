@@ -65,15 +65,18 @@ module "vpn" {
   vpc_id            = module.vpc.vpc_id
   public_subnet_id  = module.vpc.public_subnet_ids[0]
   vpc_cidr_block    = module.vpc.vpc_cidr_block
-  developer_ip_cidr = var.developer_ip_cidr
+  developer_ip_cidrs = var.developer_ip_cidrs
   client_public_key = var.wireguard_client_public_key
   wireguard_port    = 51820
 }
 
 module "route53" {
-  source       = "../../modules/route53"
-  zone_name    = var.domain_name
-  record_name  = var.app_host
-  alb_dns_name = var.alb_dns_name
-  alb_zone_id  = var.alb_dns_name != "" ? data.aws_elb_hosted_zone_id.main.id : ""
+  source                  = "../../modules/route53"
+  zone_name               = var.domain_name
+  record_name             = var.app_host
+  alb_dns_name            = var.alb_dns_name
+  alb_zone_id             = var.alb_dns_name != "" ? data.aws_elb_hosted_zone_id.main.id : ""
+  monitoring_record_name  = var.monitoring_host
+  monitoring_alb_dns_name = var.monitoring_alb_dns_name
+  monitoring_alb_zone_id  = var.monitoring_alb_dns_name != "" ? data.aws_elb_hosted_zone_id.main.id : ""
 }

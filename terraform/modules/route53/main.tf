@@ -15,3 +15,16 @@ resource "aws_route53_record" "app" {
     evaluate_target_health = true
   }
 }
+
+resource "aws_route53_record" "monitoring" {
+  count   = var.monitoring_alb_dns_name != "" && var.monitoring_alb_zone_id != "" ? 1 : 0
+  zone_id = data.aws_route53_zone.this.zone_id
+  name    = var.monitoring_record_name
+  type    = "A"
+
+  alias {
+    name                   = var.monitoring_alb_dns_name
+    zone_id                = var.monitoring_alb_zone_id
+    evaluate_target_health = true
+  }
+}

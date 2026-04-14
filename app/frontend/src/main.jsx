@@ -84,6 +84,7 @@ function App() {
         <p className="eyebrow">Project Foxtrot</p>
         <h1>Todos that survive the cluster.</h1>
         <p>Keep the list small, ship the platform properly.</p>
+        <p>Test the CI pipeline.</p>
       </section>
 
       <form className="composer" onSubmit={addTodo}>

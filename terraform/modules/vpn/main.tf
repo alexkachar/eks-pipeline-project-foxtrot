@@ -42,7 +42,7 @@ resource "aws_security_group" "vpn" {
     from_port   = var.wireguard_port
     to_port     = var.wireguard_port
     protocol    = "udp"
-    cidr_blocks = [var.developer_ip_cidr]
+    cidr_blocks = var.developer_ip_cidrs
   }
 
   egress {

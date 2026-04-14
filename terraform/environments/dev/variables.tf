@@ -33,8 +33,9 @@ variable "runner_github_token_parameter_name" {
   default = "/github/actions/foxtrot/pat"
 }
 
-variable "developer_ip_cidr" {
-  type = string
+variable "developer_ip_cidrs" {
+  type        = list(string)
+  description = "Developer IP CIDRs allowed to connect to WireGuard."
 }
 
 variable "wireguard_client_public_key" {
@@ -49,6 +50,11 @@ variable "enable_cluster_addons" {
 }
 
 variable "alb_dns_name" {
+  type    = string
+  default = ""
+}
+
+variable "monitoring_alb_dns_name" {
   type    = string
   default = ""
 }

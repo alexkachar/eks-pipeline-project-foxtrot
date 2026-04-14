@@ -14,8 +14,9 @@ variable "vpc_cidr_block" {
   type = string
 }
 
-variable "developer_ip_cidr" {
-  type = string
+variable "developer_ip_cidrs" {
+  type        = list(string)
+  description = "List of developer IP CIDRs allowed to connect to WireGuard (UDP 51820)."
 }
 
 variable "client_public_key" {
